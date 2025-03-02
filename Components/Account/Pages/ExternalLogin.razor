@@ -41,6 +41,14 @@
             </div>
             <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
         </EditForm>
+        @if (!string.IsNullOrEmpty(Input.Email))
+        {
+            <div class="mt-3">
+                <a href="@($"Account/ResendEmailConfirmation?email={Uri.EscapeDataString(Input.Email)}")" class="text-decoration-none">
+                    Didn't receive the confirmation email? Click here to resend.
+                </a>
+            </div>
+        }
     </div>
 </div>
 

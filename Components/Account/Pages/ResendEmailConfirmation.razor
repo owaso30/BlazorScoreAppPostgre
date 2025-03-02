@@ -24,7 +24,7 @@
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" role="alert" />
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" class="form-control" aria-required="true" placeholder="name@example.com" />
+                <InputText @bind-Value="Input.Email" class="form-control" aria-required="true" placeholder="name@example.com" readonly="@(!string.IsNullOrEmpty(Email))" />
                 <label for="email" class="form-label">Email</label>
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
@@ -38,6 +38,17 @@
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? Email { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(Email))
+        {
+            Input.Email = Email;
+        }
+    }
 
     private async Task OnValidSubmitAsync()
     {

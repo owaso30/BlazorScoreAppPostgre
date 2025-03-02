@@ -6,12 +6,19 @@ namespace BlazorScoreAppPostgre.Data.EmailSender
 {
     public class CustomMailSender : IEmailSender<ApplicationUser>
     {
+        private readonly IConfiguration _config;
+
+        public CustomMailSender(IConfiguration config)
+        {
+            _config = config;
+        }
+
         public async Task SendConfirmationLinkAsync(ApplicationUser user, string email, string confirmationLink)
         {
-            string fromEmail = Environment.GetEnvironmentVariable("GMAIL_ADDRESS");
+            string fromEmail = _config["GMAIL_ADDRESS"];
             string fromUserName = "メール自動送信システム";
             var fromAddress = new MailAddress(fromEmail, fromUserName);
-            string fromPassword = Environment.GetEnvironmentVariable("GMAIL_APP_PASSWORD");
+            string fromPassword = _config["GMAIL_APP_PASSWORD"];
 
             string toEmail = email; //★(a)送信先メールアドレス
             string toUserName = user.UserName; //★(b)送信先ユーザー名
@@ -44,10 +51,10 @@ namespace BlazorScoreAppPostgre.Data.EmailSender
 
         public async Task SendPasswordResetLinkAsync(ApplicationUser user, string email, string resetLink)
         {
-            string fromEmail = Environment.GetEnvironmentVariable("GMAIL_ADDRESS");
+            string fromEmail = _config["GMAIL_ADDRESS"];
             string fromUserName = "メール自動送信システム";
             var fromAddress = new MailAddress(fromEmail, fromUserName);
-            string fromPassword = Environment.GetEnvironmentVariable("GMAIL_APP_PASSWORD");
+            string fromPassword = _config["GMAIL_APP_PASSWORD"];
 
             string toEmail = email; //★(a)送信先メールアドレス
             string toUserName = user.UserName; //★(b)送信先ユーザー名

@@ -17,6 +17,15 @@
     <div class="col-md-4">
         <section>
             <StatusMessage Message="@errorMessage" />
+            @if (!IsConfirmed)
+            {
+                <div class="alert alert-danger" role="alert">
+                    Error: You must confirm your email address before logging in.
+                    <a href="@($"Account/ResendEmailConfirmation?email={Uri.EscapeDataString(Input.Email)}")">
+                        Click here to resend confirmation email.
+                    </a>
+                </div>
+            }
             <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
                 <DataAnnotationsValidator />
                 <h2>Use a local account to log in.</h2>
@@ -66,6 +75,7 @@
 
 @code {
     private string? errorMessage;
+    private bool IsConfirmed { get; set; } = true;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -87,6 +97,12 @@
 
     public async Task LoginUser()
     {
+        var user = await SignInManager.UserManager.FindByEmailAsync(Input.Email);
+        if (user != null && !await SignInManager.UserManager.IsEmailConfirmedAsync(user))
+        {
+            IsConfirmed = false;
+            return;
+        }
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);

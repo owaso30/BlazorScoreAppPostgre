@@ -1,0 +1,12 @@
+﻿<hr class="mt-5" />
+<div class="container d-flex justify-content-between align-items-center mb-3">
+	<p class="fw-bold m-0"></p>	@*ここにLOGO等を入れても良い*@
+	<small>Copyright&copy; <a href="">@name</a> All Rights Reserved.</small>
+	<a class="btn btn-primary" href="@(Href)/#"><i class="bi bi-chevron-up"></i></a>
+</div>
+
+@code {
+	private string name = "BlazorScoreApp";
+	[Parameter]
+	public string? Href { get; set; }
+}

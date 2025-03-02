@@ -1,0 +1,72 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject AuthenticationStateProvider _asp
+@inject UserManager<ApplicationUser> _um
+@inject NavigationManager _nav
+
+<PageTitle>BlazorScoreApp</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <section class="col-12 mb-4">
+            <h2 class="mb-5 text-center">四人麻雀 戦績記録アプリ</h2>
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th class="bg-light">更新日</th>
+                        <th class="bg-light">更新内容</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2023/04/15</td>
+                        <td>BlazorScoreAppリリース<span class="badge bg-danger ms-2">NEW</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="col-12 mb-4">
+            <span class="mb-2 d-block"><strong>■記録可能な対局条件項目</strong></span>
+            <ul class="list-group mb-4">
+                <li class="list-group-item">過去100試合のスコアデータの閲覧・編集が可能</li>
+                <li class="list-group-item">過去全試合の戦績表が閲覧可能</li>
+                <li class="list-group-item">30人までユーザー登録可能</li>
+            </ul>
+        </section>
+        <section class="col-12">
+            <button class="btn btn-success w-100" @onclick="onSubmit">アプリを開始する</button>
+        </section>
+    </div>
+</div>
+
+<!--フッター挿入-->
+<Copyright Href="" />
+
+@code {
+    private string _userId = string.Empty;
+    private bool IsAuthenticated => !string.IsNullOrEmpty(_userId);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await _asp.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            _userId = _um.GetUserId(user) ?? string.Empty;
+        }
+    }
+
+    private void onSubmit()
+    {
+        if (IsAuthenticated)
+        {
+            _nav.NavigateTo("scoreboard");
+        }
+        else
+        {
+            _nav.NavigateTo("Account/Login");
+        }
+    }
+}

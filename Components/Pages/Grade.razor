@@ -1,0 +1,260 @@
+﻿@page "/grade"
+@inject PlayerService _plsvc
+@inject TrialSeatService _tssvc
+@inject TableService _tbsvc
+@inject AuthenticationStateProvider _asp
+@inject UserManager<ApplicationUser> _um
+
+<AuthorizeView>
+	<Authorized>
+		<PageTitle>BlazorScoreApp | Grade</PageTitle>
+
+		@if (IsLoadingOverlay)
+		{
+			<div id="loading">
+				<div class="w-100 d-flex justify-content-center align-items-center">
+					<div class="spinner-border text-primary spinner-custom" role="status"></div>
+				</div>
+			</div>
+		}
+		else
+		{
+			<h2 class="mt-4 mb-5 text-center">戦績表</h2>
+			@if (!_tables.Any())
+			{
+				<div class="text-center fs-5"><i class="bi bi-exclamation-triangle-fill"></i>データが存在しません。</div>
+			}
+			else
+			{
+				<div class="sp">
+					<table class="table table-striped text-center sbtable">
+						<thead>
+							<tr>
+								<th>名前</th>
+								<th>卓数</th>
+								<th>平点</th>
+								<th>平順</th>
+								<th class="last5">過去5戦</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var it in _players)
+							{
+								var _tables_userid = _tables.Where(e => e.TrialSeat.PlayerId == it.PlayerId);
+								<tr>
+									<td>@it.PlayerName</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@(_tables_userid.Count())
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@(_tables_userid.Average(a => a.Score ?? 0).ToString("F1"))
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@(_tables_userid.Average(a => a.Rank ?? 0).ToString("F2"))
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@foreach (var w in _tables_userid.OrderByDescending(e => e.TrialSeatId).ThenByDescending(e => e.TableCountId).Take(5))
+										{
+											@(w.Rank + "←")
+											;
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+					<p class="mt-4">※各着順率は画面を横向きにすると表示されます。</p>
+				</div>
+
+				<div class="pc">
+					<table class="table table-striped text-center sbtable">
+						<thead>
+							<tr>
+								<th>名前</th>
+								<th>卓数</th>
+								<th>平点</th>
+								<th>平順</th>
+								<th>1st%</th>
+								<th>2nd%</th>
+								<th>3rd%</th>
+								<th>4th%</th>
+								<th class="w-25">過去5戦</th>
+							</tr>
+						</thead>
+						<tbody>
+							@foreach (var it in _players.Select((Value, Index) => new { Value, Index }))
+							{
+								var _tables_userid = _tables.Where(e => e.TrialSeat.PlayerId == it.Value.PlayerId);
+								string[]? ratio_1 = new string[playercount];
+								string[]? ratio_2 = new string[playercount];
+								string[]? ratio_3 = new string[playercount];
+								string[]? ratio_4 = new string[playercount];
+								<tr>
+									<td>@it.Value.PlayerName</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@(_tables_userid.Count())
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@(_tables_userid.Average(a => a.Score ?? 0).ToString("F1"))
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@(_tables_userid.Average(a => a.Rank ?? 0).ToString("F2"))
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									@for (var i = 0; i < 4; i++)
+									{
+										var ratio = (1.0 * _tables.Where(e => e.TrialSeat.PlayerId == it.Value.PlayerId && e.Rank == i + 1).Count() * 100 / _tables.Where(e => e.TrialSeat.PlayerId == it.Value.PlayerId).Count()).ToString("F1");
+										switch (i)
+										{
+											case 0:
+												ratio_1[it.Index] = ratio;
+												break;
+											case 1:
+												ratio_2[it.Index] = ratio;
+												break;
+											case 2:
+												ratio_3[it.Index] = ratio;
+												break;
+											case 3:
+												ratio_4[it.Index] = ratio;
+												break;
+										}
+									}
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@ratio_1[it.Index]
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@ratio_2[it.Index]
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@ratio_3[it.Index]
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@if (_tables_userid.Any())
+										{
+											@ratio_4[it.Index]
+										}
+										else
+										{
+											@("---")
+										}
+									</td>
+									<td>
+										@foreach (var w in _tables_userid.OrderByDescending(e => e.TrialSeatId).ThenByDescending(e => e.TableCountId).Take(5))
+										{
+											@(w.Rank + "←")
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			}
+
+			<!--フッター挿入-->
+			<Copyright />
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code {
+	private string _userId = string.Empty;
+	private bool IsAuthenticated => !string.IsNullOrEmpty(_userId);
+	private bool IsLoadingOverlay = false;
+	private List<TrialSeat> _trialseats = new();
+	private List<Player> _players = new();
+	private List<Table> _tables = new();
+	private int playercount { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await _asp.GetAuthenticationStateAsync();
+		var user = authState.User;
+
+		if (user.Identity?.IsAuthenticated == true)
+		{
+			_userId = _um.GetUserId(user) ?? string.Empty;
+			if (IsAuthenticated)
+			{
+				await onInit();
+			}
+		}
+	}
+
+	private async Task onInit()
+	{
+		IsLoadingOverlay = true;
+		await Task.Delay(1); // これをしないと、画面にスレッドが切り替わらず、オーバーレイが表示されない。StateHasChanged()でもだめ。
+
+		_tables = await _tbsvc.GetValuesAsync(_userId);
+		_trialseats = await _tssvc.GetValuesAsync(_userId);
+		_players = await _plsvc.GetValuesAsync(_userId);
+		playercount = _players.Count;
+
+		IsLoadingOverlay = false;
+		StateHasChanged();
+	}
+}

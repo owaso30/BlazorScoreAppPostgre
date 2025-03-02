@@ -1,0 +1,33 @@
+﻿@charset "utf-8";
+
+@media screen and (max-width: 480px) {
+    div {
+        font-size: small;
+    }
+}
+
+@media screen and (max-width: 680px) {
+    .pc {
+        display: none;
+    }
+}
+
+@media screen and (min-width: 681px) {
+    .sp {
+        display: none;
+    }
+}
+
+.sbtable {
+    table-layout: fixed;
+}
+.sbtable .last5 {
+    width: 140px;
+}
+.sbtable tr th, tr td {
+    border: 1px solid #cccccc;
+}
+
+.pc .bg-custom1 {
+    background-color: beige;
+}

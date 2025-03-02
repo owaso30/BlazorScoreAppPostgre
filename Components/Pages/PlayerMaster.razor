@@ -1,0 +1,200 @@
+﻿@page "/player"
+@rendermode InteractiveServer
+@inject PlayerService _plsvc
+@inject TrialSeatService _tssvc
+@inject TableService _tbsvc
+@inject AuthenticationStateProvider _asp
+@inject UserManager<ApplicationUser> _um
+@inject IJSRuntime _jsrt
+@inject NavigationManager _nav
+
+<AuthorizeView>
+	<Authorized>
+		<PageTitle>BlazorScoreApp | Player</PageTitle>
+
+		@if (IsLoadingOverlay)
+		{
+			<div id="loading">
+				<div class="w-100 d-flex justify-content-center align-items-center">
+					<div class="spinner-border text-primary spinner-custom" role="status"></div>
+				</div>
+			</div>
+		}
+		else
+		{
+			<div class="container mt-4">
+				<h2 class="text-center mb-4">プレイヤー管理</h2>
+				<div class="row">
+					<div class="col-md-2 mt-1 form-group">
+						<label for="id" class="fw-bold">ID</label>
+						<input style="font-size:larger" type="number" id="id" readonly @bind="_player.PlayerId" class="form-control" />
+					</div>
+					<div class="col-md-6 mt-1 form-group">
+						<label for="name" class="fw-bold">名前（5文字以内）</label>
+						<input style="font-size:larger" type="text" id="name" readonly="@(_player.PlayerId > 0 ? false : true)" @bind="_player.PlayerName" class="form-control" />
+					</div>
+					<div class="col-md-2 mt-1 align-self-end">
+						<button class="btn btn-primary w-100" @onclick="onUpdate">登録</button>
+					</div>
+					<div class="col-md-2 mt-1 align-self-end">
+						<button class="col-md-2 btn btn-secondary w-100" @onclick="onDelete">削除</button>
+					</div>
+				</div>
+				<div class="row mt-4">
+					<div class="col-md-4">
+						<table class="table table-bordered">
+							<thead>
+								<tr>
+									<th class="bg-light w-25">ID</th>
+									<th class="bg-light">名前</th>
+								</tr>
+							</thead>
+							<tbody>
+								@for (int i = 0; i < 10; i++)
+								{
+									int x = i + 1;
+									<tr @onclick="e => onSelected(x)">
+										<td style="@(x == _player.PlayerId ? "background:floralwhite" : "")">@x</td>
+										<td style="@(x == _player.PlayerId ? "background:floralwhite" : "")">@_players.Where(e => e.PlayerId == x).Select(e => e.PlayerName).FirstOrDefault()</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					<div class="col-md-4">
+						<table class="table table-bordered">
+							<thead>
+								<tr>
+									<th class="bg-light w-25">ID</th>
+									<th class="bg-light">名前</th>
+								</tr>
+							</thead>
+							<tbody>
+								@for (int i = 10; i < 20; i++)
+								{
+									int x = i + 1;
+									<tr @onclick="e => onSelected(x)">
+										<td style="@(x == _player.PlayerId ? "background:floralwhite" : "")">@x</td>
+										<td style="@(x == _player.PlayerId ? "background:floralwhite" : "")">@_players.Where(e => e.PlayerId == x).Select(e => e.PlayerName).FirstOrDefault()</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+					<div class="col-md-4">
+						<table class="table table-bordered">
+							<thead>
+								<tr>
+									<th class="bg-light w-25">ID</th>
+									<th class="bg-light">名前</th>
+								</tr>
+							</thead>
+							<tbody>
+								@for (int i = 20; i < 30; i++)
+								{
+									int x = i + 1;
+									<tr @onclick="e => onSelected(x)">
+										<td style="@(x == _player.PlayerId ? "background:floralwhite" : "")">@x</td>
+										<td style="@(x == _player.PlayerId ? "background:floralwhite" : "")">@_players.Where(e => e.PlayerId == x).Select(e => e.PlayerName).FirstOrDefault()</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+
+			<!--フッター挿入-->
+			<Copyright Href="/player" />
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code {
+	private bool IsLoadingOverlay = true;
+	private string _userId = string.Empty;
+	private bool IsAuthenticated => !string.IsNullOrEmpty(_userId);
+	private List<Player> _players = new();
+	private Player _player { get; set; } = new();
+	private List<Table> _tables = new();
+	private List<TrialSeat> _trialseats = new();
+	private int NewPlayerId { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await _asp.GetAuthenticationStateAsync();
+		var user = authState.User;
+
+		if (user.Identity?.IsAuthenticated == true)
+		{
+			_userId = _um.GetUserId(user) ?? string.Empty;
+			if (IsAuthenticated)
+			{
+				await onRefresh();
+			}
+		}
+	}
+	///検索
+	private async Task onRefresh()
+	{
+		IsLoadingOverlay = true;
+		StateHasChanged();
+
+		_player = new(); // 【超重要】ここで初期化しないと、データの連続処理ができない（データの確定に至らない）
+		_players = await _plsvc.GetValuesAsync(_userId);
+		_tables = await _tbsvc.GetValuesAsync(_userId);
+		_trialseats = await _tssvc.GetValuesAsync(_userId);
+
+		IsLoadingOverlay = false;
+		StateHasChanged();
+	}
+	///Playerを選択する
+	private void onSelected(int playerid)
+	{
+		_player.PlayerId = playerid;
+		_player.PlayerName = _players.Where(e => e.PlayerId == playerid).Select(e => e.PlayerName).FirstOrDefault();
+	}
+	///データ更新
+	private async Task onUpdate()
+	{
+		if (_player.PlayerId == 0) return;
+		// 名前重複チェック
+		if (_players.Any(e => e.PlayerName == _player.PlayerName))
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "同じ名前のプレイヤーが存在します。違う名前を付けてください");
+			return;
+		}
+		// 文字数制限チェック
+		if (_player.PlayerName?.Length > 5)
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "名前は5文字以内にしてください");
+			return;
+		}
+		// 新規登録・更新処理
+		if (_players.Any(e => e.PlayerId == _player.PlayerId))
+		{
+			await _plsvc.UpdateValueAsync(_userId, _player);
+		}
+		else
+		{
+			await _plsvc.AddValueAsync(_userId, _player);
+		}
+		// 画面更新
+		await _jsrt.InvokeAsync<string>("jsFunctions.alert", "メンバーを新規登録または名前を変更しました");
+		await onRefresh();
+	}
+	///データ削除
+	private async void onDelete()
+	{
+		if (_tables == null) return;
+		if (_tables.Where(e => e.TrialSeat.PlayerId == _player.PlayerId).Any())
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "対象のメンバー対局データが存在するので削除できません");
+			return;
+		}
+		if (await _jsrt.InvokeAsync<int>(
+			"jsFunctions.confirm", "このメンバーを削除してもよろしいですか？") == 0) return;
+		await _plsvc.DeleteValueAsync(_userId, _player.PlayerId);
+		await onRefresh();
+	}
+}

@@ -1,0 +1,562 @@
+﻿@page "/scoreboard"
+@rendermode InteractiveServer
+@inject PlayerService _plsvc
+@inject TrialService _trsvc
+@inject TrialSeatService _tssvc
+@inject TableService _tbsvc
+@inject AuthenticationStateProvider _asp
+@inject UserManager<ApplicationUser> _um
+@inject IJSRuntime _jsrt
+
+<AuthorizeView>
+	<Authorized>
+		<PageTitle>BlazorScoreApp | ScoreBoard</PageTitle>
+
+		@if (IsLoadingOverlay)
+		{
+			<div id="loading">
+				<div class="w-100 d-flex justify-content-center align-items-center">
+					<div class="spinner-border text-primary spinner-custom" role="status"></div>
+				</div>
+			</div>
+		}
+		else
+		{
+			// 選択された対局中の登録メンバー数を取得
+			if (_trialseats.Any(e => e.TrialId == _trial.TrialId))
+			{
+				seatCount = _trialseats.Where(a => a.TrialId == _trial.TrialId).Count();
+			}
+			else
+			{
+				seatCount = 0;
+			}
+			cell = new int?[seatCount];
+			sumCell = new int?[seatCount];
+			for (var i = 0; i < seatCount; i++)
+			{
+				cell[i] = 0;
+				sumCell[i] = 0;
+			}
+
+			for (var i = 0; i < (_tables.Where(e => e.TrialSeat.TrialId == _trial.TrialId).ToList().Count) / 4; i++)
+			{
+				for (var j = 0; j < seatCount; j++)
+				{
+					foreach (var k in _tables.Where(e => e.TrialSeat.TrialId == _trial.TrialId).Where(u => u.TableCountId == i + 1))
+					{
+						if (k.TrialSeat.SeatId == j + 1)
+						{
+							sumCell[j] += k.Score;
+						}
+					}
+				}
+			}
+			_trial.TrialDateTime = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.TrialDateTime).FirstOrDefault();
+			_trial.StartReturn = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.StartReturn).FirstOrDefault();
+			_trial.BonusByRanking = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.BonusByRanking).FirstOrDefault();
+			_trial.ChipsPrice = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.ChipsPrice).FirstOrDefault();
+			_trial.YakitoriPrice = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.YakitoriPrice).FirstOrDefault();
+			_trial.TobiPrice = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.TobiPrice).FirstOrDefault();
+			_trial.YakumanPrice = _trials.Where(a => a.TrialId == _trial.TrialId).Select(a => a.YakumanPrice).FirstOrDefault();
+
+			<div class="container mt-4">
+				<h2 class="mb-4 text-center">スコアボード</h2>
+				<div class="sbmenu">
+					<div class="col-12">対局日時:</div>
+					<div class="row">
+						<div class="col-md-8 mt-1">
+							<select style="font-size:larger;background-color:honeydew" @bind="_trial.TrialId" class="form-control">
+								@foreach (var it in _trials.OrderByDescending(m => m.TrialId))
+								{
+									<option value="@it.TrialId">@it.TrialDateTime.AddHours(9).ToString("yyyy/MM/dd(ddd) HH:mm")</option> <!-- UTC+9表記へ -->
+								}
+							</select>
+						</div>
+						<div class="col-md-2 mt-1"><button class="btn btn-primary w-100" @onclick="onTrialAdd">作成</button></div>
+						<div class="col-md-2 mt-1"><button class="btn btn-secondary w-100" @onclick="onTrialDel">削除</button></div>
+					</div>
+					<div class="row">
+						<div class="col-md-10">
+							<table class="table table-sm text-center mt-3 mb-0 sbtable">
+								<tr>
+									<td>始-返</td>
+									<td>ウマ</td>
+									<td>チップ点/枚</td>
+									<td>焼き鳥点/人</td>
+									<td>飛び賞点/人</td>
+									<td>役満賞点/人</td>
+								</tr>
+								<tr>
+									<td><label>@_trial.StartReturn</label></td>
+									<td><label>@_trial.BonusByRanking</label></td>
+									<td><label>@_trial.ChipsPrice</label></td>
+									<td><label>@_trial.YakitoriPrice</label></td>
+									<td><label>@_trial.TobiPrice</label></td>
+									<td><label>@_trial.YakumanPrice</label></td>
+								</tr>
+								<tr>
+									<td>
+										<select @bind="_startreturn" class="form-control text-center">
+											<option></option>
+											<option>25-30</option>
+											<option>20-25</option>
+										</select>
+									</td>
+									<td>
+										<select @bind="_bonusbyranking" class="form-control text-center">
+											<option></option>
+											<option>10-30</option>
+											<option>10-20</option>
+											<option>5-10</option>
+										</select>
+									</td>
+									<td><input type="number" @bind="_chipsprice" class="form-control text-center" /></td>
+									<td><input type="number" @bind="_yakitoriprice" class="form-control text-center" /></td>
+									<td><input type="number" @bind="_tobiprice" class="form-control text-center" /></td>
+									<td><input type="number" @bind="_yakumanprice" class="form-control text-center" /></td>
+								</tr>
+							</table>
+						</div>
+						<div class="col-md-2 align-self-end mt-1">
+							<button class="btn btn-success w-100" @onclick="onTrialUpdate">変更</button>
+						</div>
+					</div>
+					<details class="mt-4 mb-3">
+						<summary class="mb-3">クリックしてプレイヤーを追加・削除する</summary>
+						<div class="col-12">次のプレイヤーを追加する: </div>
+						<div class="row">
+							<div class="col-md-8 mt-1">
+								<select @bind="_trialseat.PlayerId" class="form-control">
+									<option selected value="-1">select one</option>
+									@foreach (var it in filteredPlayers)
+									{
+										<option value="@it.PlayerId">@it.PlayerName</option>
+									}
+								</select>
+							</div>
+							<div class="col-md-2 mt-1">
+								<button class="btn btn-primary w-100" @onclick="onUserAdd" disabled="@(IsButtonDisabled())">追加</button>
+							</div>
+							<div class="col-md-2 mt-1">
+								<button class="btn btn-secondary w-100" @onclick="onUserDel">削除</button>
+							</div>
+							<p class="text-danger">
+								※既に値データが存在するプレイヤーは削除できません。プレイヤーは最大で8人まで追加できます。
+							</p>
+						</div>
+					</details>
+				</div>
+
+				<div class="sp">
+					@if (_trialseats.Where(a => a.TrialId == _trial.TrialId).Count() < 4)
+					{
+						foreach (var it in _trialseats.Where(a => a.TrialId == _trial.TrialId))
+						{
+							@(it.SeatId + "." + it.Player.PlayerName)
+							<br />
+						}
+					}
+					else
+					{
+						<table class="table table-striped m-0 text-center sbtable">
+							<thead>
+								<tr>
+									<th>名前</th>
+									<th class="w-25">合計</th>
+									<th class="w-25">登録</th>
+								</tr>
+							</thead>
+							<tbody>
+								<!-- [it.index] を [it.SeatId - 1] にするとエラーが起こる -->
+								@foreach (var it in _trialseats.Where(a => a.TrialId == _trial.TrialId).OrderBy(e => e.SeatId).Select((value, index) => new { value, index }))
+								{
+									<tr>
+										<td>@it.value.Player.PlayerName</td>
+										<td>@sumCell[it.index]</td>
+										<td>
+											<input type="number" @bind="ic[it.index]" class="form-control text-center" />
+										</td>
+									</tr>
+								}
+
+								<tr>
+									<td></td>
+									<td></td>
+									<td>@CalculateSum()</td>
+								</tr>
+							</tbody>
+						</table>
+						<div class="row justify-content-end">
+							<div class="col-md-2 mt-1">
+								<button class="btn btn-primary w-100" disabled="@(buttonDisabled)" @onclick="onScoreAdd">登録</button>
+							</div>
+						</div>
+					}
+				</div>
+
+				<div class="pc">
+					@if (_trialseats.Where(a => a.TrialId == _trial.TrialId).Count() < 4)
+					{
+						foreach (var it in _trialseats.Where(a => a.TrialId == _trial.TrialId))
+						{
+							@(it.SeatId + "." + it.Player.PlayerName)
+							<br />
+						}
+					}
+					else
+					{
+						<table class="table text-center sbtable">
+							<thead>
+								<tr>
+									<th class="bg-light">卓番</th>
+									@foreach (var it in _trialseats.Where(a => a.TrialId == _trial.TrialId))
+									{
+										<th class="bg-custom1">@it.Player.PlayerName</th>
+									}
+									<th class="bg-light"></th>
+								</tr>
+							</thead>
+							<tbody>
+								@for (int i = 0; i < (_tables.Where(e => e.TrialSeat.TrialId == _trial.TrialId).ToList().Count) / 4; i++)
+								{
+									<!-- iを直接@bind内で使用すると正常にバインドされない -->
+									int x = i + 1;
+									<tr>
+										<td class="bg-light">@(i + 1)</td>
+										@for (int j = 0; j < seatCount; j++)
+										{
+											<td>
+												@foreach (var k in _tables.Where(e => e.TrialSeat.TrialId == _trial.TrialId).Where(u => u.TableCountId == i + 1))
+												{
+													@if (k.TrialSeat.SeatId == j + 1)
+													{
+														@(cell[j] = k.Score)
+													}
+												}
+											</td>
+										}
+										<td class="bg-light"><button class="btn btn-secondary btn-sm" @onclick="() => onScoreDelete(x)">削除</button></td>
+									</tr>
+								}
+								<tr class="fw-bold">
+									<td class="bg-light">合計</td>
+									@for (var j = 0; j < seatCount; j++)
+									{
+										<td>
+											@sumCell[j]
+										</td>
+									}
+									<td class="bg-light"></td>
+								</tr>
+								<tr>
+									<td class="bg-light align-content-center">登録</td>
+									@for (int i = 0; i < seatCount && i < 8; i++)
+									{
+										<!-- iを直接@bind内で使用すると正常にバインドされない -->
+										int x = i;
+										<td>
+											<label id="seat-@(i+1)" style="font-size:small">
+												@(_trialseats.Where(a => a.TrialId == _trial.TrialId).Where(a => a.SeatId == i + 1).Select(a => a.Player.PlayerName).FirstOrDefault() + ":")
+											</label>
+											<input id="seat-@(i+1)" type="number" @bind="ic[x]" class="form-control text-center" />
+										</td>
+									}
+									<td class="bg-light align-content-center">@CalculateSum()</td>
+								</tr>
+							</tbody>
+						</table>
+						<div class="row justify-content-end">
+							<div class="col-md-2 mt-1">
+								<button class="btn btn-primary w-100" disabled="@(buttonDisabled)" @onclick="onScoreAdd">登録</button>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+
+			<!--フッター挿入-->
+			<Copyright Href="/scoreboard" />
+		}
+	</Authorized>
+</AuthorizeView>
+
+@code {
+	private string? _startreturn { get; set; }
+	private string? _bonusbyranking { get; set; }
+	private int? _chipsprice { get; set; }
+	private int? _yakitoriprice { get; set; }
+	private int? _tobiprice { get; set; }
+	private int? _yakumanprice { get; set; }
+	private string _userId = string.Empty;
+	private bool IsAuthenticated => !string.IsNullOrEmpty(_userId);
+	private bool IsLoadingOverlay = true;
+	private bool buttonDisabled { get; set; } = false;
+	private int seatCount { get; set; }
+	private int?[]? cell { get; set; }
+	private int?[]? sumCell { get; set; }
+	private int?[] ic = new int?[8];
+	private List<Trial> _trials = new();
+	private Trial _trial { get; set; } = new();
+	private List<TrialSeat> _trialseats = new();
+	private TrialSeat _trialseat { get; set; } = new();
+	private List<Player> _players = new();
+	private List<Table> _tables = new();
+	private Table _table { get; set; } = new();
+	private List<Player> filteredPlayers = new();
+	private List<int> excludedIds = new();
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await _asp.GetAuthenticationStateAsync();
+		var user = authState.User;
+
+		if (user.Identity?.IsAuthenticated == true)
+		{
+			_userId = _um.GetUserId(user) ?? string.Empty;
+			if (IsAuthenticated)
+			{
+				_trials = await _trsvc.GetValuesAsync(_userId);
+				if (_trials.Any())
+				{
+					_trial.TrialId = _trials.Max(m => m.TrialId);
+				}
+				await onInit();
+			}
+		}
+	}
+
+	private async Task onInit()
+	{
+		IsLoadingOverlay = true;
+		StateHasChanged(); // ここでUIを更新
+
+		await Update();
+		onFilter();
+
+		IsLoadingOverlay = false;
+		StateHasChanged();
+	}
+
+	private async Task Update()
+	{
+		_trialseat = new(); // 【超重要】ここで初期化しないと、データの連続処理ができない（データの確定に至らない）
+		_table = new(); // 【超重要】ここで初期化しないと、データの連続処理ができない（データの確定に至らない）
+		_tables = await _tbsvc.GetValuesAsync(_userId);
+		_trials = await _trsvc.GetValuesAsync(_userId);
+		_trialseats = await _tssvc.GetValuesAsync(_userId);
+		_players = await _plsvc.GetValuesAsync(_userId);
+	}
+
+	// 整数のシーケンスを生成し、各整数値を代入した場合の合計を算出
+	private int CalculateSum()
+	{
+		return Enumerable.Range(0, 8).Sum(i => ic[i] ?? 0);
+	}
+
+	// メンバー選択プルダウンに表示される選択肢をフィルター
+	private void onFilter()
+	{
+		filteredPlayers = new();
+		excludedIds = new();
+		if (!_players.Any()) return;
+		foreach (var it in _trialseats.Where(e => e.TrialId == _trial.TrialId))
+		{
+			excludedIds.Add(it.PlayerId);
+		}
+		filteredPlayers = FilterDataModels(_players, excludedIds);
+	}
+
+	// 特定のIDを含まないリストを抽出するメソッド
+	private List<Player> FilterDataModels(List<Player> models, List<int> excludedIds)
+	{
+		return models.Where(model => !excludedIds.Contains(model.PlayerId)).ToList();
+	}
+
+	private async Task onUserAdd()
+	{
+		if (_trialseat.PlayerId == -1) return;
+		_trialseat.TrialId = _trial.TrialId;
+		_trialseat.SeatId = seatCount + 1;
+		await _tssvc.AddValueAsync(_userId, _trialseat);
+		await onInit();
+	}
+	private async Task onUserDel()
+	{
+		if (_tables.Where(t => t.TrialSeatId == _trialseats.Where(a => a.TrialId == _trialseat.TrialId).Max(a => a.TrialSeatId)).ToList().Count != 0)
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "表右端のメンバーは既にデータが入っているため削除できません");
+			return;
+		}
+		if (await _jsrt.InvokeAsync<int>(
+			"jsFunctions.confirm", "表右端のメンバーを削除してもよろしいですか？") == 0) return;
+
+		await _tssvc.DeleteValueAsync(_userId, _trialseats.Where(u => u.TrialId == _trial.TrialId).Max(a => a.TrialSeatId));
+		await onInit();
+	}
+	private async Task onScoreAdd()
+	{
+		if (seatCount < 4) return;
+		if (CalculateSum() != 0 || ic.Count(item => item == null) != 4) // 全員の点数の合計が0かつic配列内に中身がnullのものが4つ
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "終局時スコアが正しく入力されていません");
+			return;
+		}
+
+		if (await _jsrt.InvokeAsync<int>("jsFunctions.confirm", "卓データを追加しますか？") == 0) return;
+
+		// ボタン2度押し対策
+		buttonDisabled = true;
+
+		int?[] c = new int?[4];
+		int[] b = new int[4];
+		for (var i = 0; i < seatCount; i++)
+		{
+			if (ic[i] != null)
+			{
+				int index = Array.IndexOf(c, null);
+				b[index] = _trialseats.Where(a => a.TrialId == _trial.TrialId && a.SeatId == i + 1)
+											.Select(s => s.TrialSeatId)
+											.FirstOrDefault();
+				c[index] = ic[i];
+			}
+		}
+
+		int[] rank = new int[4];
+		for (var i = 0; i < 4; i++)
+		{
+			rank[i] = 1;
+			for (var j = 0; j < 4; j++)
+			{
+				if (i != j && c[i] < c[j])
+				{
+					rank[i]++;
+				}
+			}
+		}
+
+		_table.TableCountId = (_tables.Count(e => e.TrialSeat.TrialId == _trial.TrialId) / 4) + 1;
+
+		for (var i = 0; i < 4; i++)
+		{
+			_table.TableId = 0;
+			_table.Rank = rank[i];
+			_table.TrialSeatId = b[i];
+			_table.Score = c[i];
+			await _tbsvc.AddValueAsync(_userId, _table);
+		}
+
+		buttonDisabled = false;
+		onScoreClear();
+		await onInit();
+
+	}
+	private async Task onScoreDelete(int tableno)
+	{
+		if (await _jsrt.InvokeAsync<int>("jsFunctions.confirm", $"卓番{tableno}を削除してもよろしいですか？") == 0) return;
+		foreach (var it in _tables.Where(e => e.TrialSeat.TrialId == _trial.TrialId && e.TableCountId == tableno))
+		{
+			await _tbsvc.DeleteValueAsync(_userId, it.TableId);
+		}
+		foreach (var it in _tables.Where(e => e.TrialSeat.TrialId == _trial.TrialId && e.TableCountId > tableno))
+		{
+			_table.TableId = it.TableId;
+			_table.TrialSeatId = it.TrialSeatId;
+			_table.TableCountId = it.TableCountId - 1;
+			_table.Rank = it.Rank;
+			_table.Score = it.Score;
+			await _tbsvc.UpdateValueAsync(_userId, _table);
+		}
+		await onInit();
+	}
+	private void onScoreClear()
+	{
+		for (var i = 0; i < _trialseats.Where(a => a.TrialId == _trial.TrialId).ToList().Count; i++)
+		{
+			ic[i] = null;
+		}
+	}
+
+	private async Task onTrialAdd()
+	{
+		if (await _jsrt.InvokeAsync<int>("jsFunctions.confirm", "新規ページを作成しますか？") == 0) return;
+		if (_trials.Count == 0)
+		{
+			_trial.StartReturn = "25-30";
+			_trial.BonusByRanking = "10-30";
+			_trial.ChipsPrice = 0;
+			_trial.YakitoriPrice = 0;
+			_trial.TobiPrice = 0;
+			_trial.YakumanPrice = 0;
+		}
+		else
+		{
+			_trial.TrialId = 0;
+			_trial.StartReturn = _trials.OrderByDescending(a => a.TrialId).Select(a => a.StartReturn).FirstOrDefault();
+			_trial.BonusByRanking = _trials.OrderByDescending(a => a.TrialId).Select(a => a.BonusByRanking).FirstOrDefault();
+			_trial.ChipsPrice = _trials.OrderByDescending(a => a.TrialId).Select(a => a.ChipsPrice).FirstOrDefault();
+			_trial.YakitoriPrice = _trials.OrderByDescending(a => a.TrialId).Select(a => a.YakitoriPrice).FirstOrDefault();
+			_trial.TobiPrice = _trials.OrderByDescending(a => a.TrialId).Select(a => a.TobiPrice).FirstOrDefault();
+			_trial.YakumanPrice = _trials.OrderByDescending(a => a.TrialId).Select(a => a.YakumanPrice).FirstOrDefault();
+		}
+		_trial.TrialDateTime = DateTime.Now;
+		await _trsvc.AddValueAsync(_userId, _trial);
+		await onInit();
+	}
+	private async Task onTrialDel()
+	{
+		if (_trialseats == null) return;
+		if (_trialseats.Where(b => b.TrialId == _trialseat.TrialId).ToList().Count != 0)
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "現在のページは既にデータが入っているため削除できません");
+			return;
+		}
+		if (await _jsrt.InvokeAsync<int>("jsFunctions.confirm", "現在のページを削除してもよろしいですか？") == 0) return;
+		await _trsvc.DeleteValueAsync(_userId, _trial.TrialId);
+		await onInit();
+	}
+	private bool IsButtonDisabled()
+	{
+		if (_trialseats.Where(b => b.TrialId == _trial.TrialId).ToList().Count > 7)
+		{
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	// 対局パラメータ更新
+	private async void onTrialUpdate()
+	{
+		if (!_trials.Any())
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "はじめに対局を作成してください");
+			return;
+		}
+
+		// プロパティの更新
+		_trial.StartReturn = string.IsNullOrEmpty(_startreturn) ? _trial.StartReturn : _startreturn;
+		_trial.BonusByRanking = string.IsNullOrEmpty(_bonusbyranking) ? _trial.BonusByRanking : _bonusbyranking;
+		_trial.ChipsPrice = _chipsprice ?? _trial.ChipsPrice;
+		_trial.YakitoriPrice = _yakitoriprice ?? _trial.YakitoriPrice;
+		_trial.TobiPrice = _tobiprice ?? _trial.TobiPrice;
+		_trial.YakumanPrice = _yakumanprice ?? _trial.YakumanPrice;
+
+		try
+		{
+			// 更新処理
+			await _trsvc.UpdateValueAsync(_userId, _trial);
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "対局パラメータを変更しました");
+
+			// リストを更新
+			_startreturn = _bonusbyranking = null;
+			_chipsprice = _yakitoriprice = _tobiprice = _yakumanprice = null;
+			await onInit();
+		}
+		catch
+		{
+			await _jsrt.InvokeAsync<string>("jsFunctions.alert", "対局パラメータが正しく入力されていないため変更できません");
+		}
+	}
+}
